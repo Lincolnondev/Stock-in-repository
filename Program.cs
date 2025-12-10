@@ -1,17 +1,16 @@
 using Microsoft.EntityFrameworkCore;
+using EstoqueAPI.Data; // se sua pasta Data estiver nesse namespace
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Controllers
+// Add Controllers
 builder.Services.AddControllers();
 
-// DbContext + MySQL
+// Add DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseMySql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
-        ServerVersion.AutoDetect(
-            builder.Configuration.GetConnectionString("DefaultConnection")
-        )
+        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
     )
 );
 
@@ -21,6 +20,7 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// Middlewares
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -29,6 +29,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
+
+// Controllers
 app.MapControllers();
 
 app.Run();
