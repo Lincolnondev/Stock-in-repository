@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pedido e Emissão de Nota</title>
+  <style>
+    * { font-family: Arial, sans-serif; margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #f2f2f2; padding: 20px; color: #111 }
+
+    /* Dark mode */
+    body.dark { background: #121212; color: #e6e6e6 }
+    body.dark .container { background: #1e1e1e; box-shadow: 0 0 12px #0008 }
+    body.dark .card { background: #1b1b1b; border-color: #333 }
+    body.dark table th { background: #222 }
+    body.dark input { background: #222; color: #e6e6e6; border-color: #333 }
+    body.dark button { opacity: 0.95 }
+
+    h1 { margin-bottom: 20px; }
+
+    .container { max-width: 1100px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px #0003; }
+
+    .topbar { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+    .card { background: #fff; padding: 15px; border-radius: 8px; border: 1px solid #ddd; }
+    .card h2 { margin-bottom: 10px; }
+
+    button { background: #007bff; color: white; border: none; padding: 8px 14px; border-radius: 5px; cursor: pointer; margin-top: 5px; }
+    button.ghost { background: transparent; color:#007bff; border:1px solid #cfe0ff }
+    button:hover { opacity: 0.95; }
+
+    input, select { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 12px; border-radius: 5px; border: 1px solid #ccc; }
+
+    .product-row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:6px;border:1px solid #eee;margin-bottom:8px}
+    .product-row .meta{display:flex;gap:12px;align-items:center}
+
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 10px; text-align: center; }
+    th { background: #eee; }
+
+    .total { font-size: 18px; font-weight: bold; margin-top: 10px; }
+
+    .emitir-btn { background: #28a745; width: 100%; padding: 12px; font-size: 18px; }
+
+    .msg { margin-top: 15px; padding: 12px; border-radius: 5px; display: none; }
+    .success { background: #c8f7c5; color: #2e7d32; }
+    .error { background: #ffd3d3; color: #b71c1c; }
+
+    /* Nota fiscal styling */
+    .nota-fiscal { margin-top: 20px; padding: 16px; border:1px solid #ddd; border-radius:8px; background:#fff }
+    .nota-fiscal h3{margin-top:0}
+
+    @media (max-width:800px){ .grid{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="topbar">
+    <h1>Pedido e Emissão de Nota</h1>
+    <div>
+      <button onclick="toggleDarkMode()" class="ghost">Alternar Tema</button>
+    </div>
+  </div>
+
+  <div class="grid">
+
+    <!-- Lista de Produtos -->
+    <div class="card">
+      <h2>Produtos</h2>
+      <div id="product-list"></div>
+    </div>
+
+    <!-- Carrinho -->
+    <div class="card">
+      <h2>Carrinho</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Item</th>
+            <th>Qtd</th>
+            <th>Preço</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody id="cart-body"></tbody>
+      </table>
+      <p class="total">Total: R$ <span id="total">0.00</span></p>
+    </div>
+  </div>
+
+  <!-- Dados do Cliente -->
+  <div class="card" style="margin-top: 20px;">
+    <h2>Dados do Cliente</h2>
+    <label>Nome:</label>
+    <input type="text" id="nome" />
+
+    <label>CPF/CNPJ:</label>
+    <input type="text" id="cpf" />
+
+    <label>Email:</label>
+    <input type="email" id="email" />
+
+    <label>Endereço:</label>
+    <input type="text" id="endereco" />
+  </div>
+
+  <!-- Botão Emitir Nota -->
+  <button class="emitir-btn" onclick="emitirNota()">Emitir Nota</button>
+
+  <div id="msg" class="msg"></div>
+
+  <!-- Nota Fiscal (aparece aqui) -->
+  <div id="notaFiscal" class="nota-fiscal" style="display:none"></div>
+
+</div>
+
+<script>
+  // Produtos de exemplo — você pode substituir por fetch
+  const products = [
+    { id: 1, nome: "Coxinha", preco: 6.00 },
+    { id: 2, nome: "Refrigerante", preco: 8.00 },
+    { id: 3, nome: "Hambúrguer", preco: 12.00 },
+  ];
+
+  // Estado do carrinho
+  const cart = [];
+
+  // Renders
+  function renderProducts() {
+    const list = document.getElementById('product-list');
+    list.innerHTML = "";
+
+    products.forEach(p => {
+      const row = document.createElement('div');
+      row.className = 'product-row';
+      row.innerHTML = `
+        <div class="meta">
+          <div style="font-weight:600">${p.nome}</div>
+          <div class="small">R$ ${p.preco.toFixed(2)}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="number" min="1" value="1" id="qty-${p.id}" style="width:70px;padding:6px;border-radius:6px;border:1px solid #ddd" />
+          <button onclick="addToCart(${p.id})">Adicionar</button>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+  }
+
+  function addToCart(id) {
+    const product = products.find(p => p.id === id);
+    if(!product) return;
+    const qtyInput = document.getElementById('qty-' + id);
+    const qty = Math.max(1, Number(qtyInput ? qtyInput.value : 1));
+
+    const existing = cart.find(i => i.id === id);
+    if (existing) {
+      existing.qtd += qty;
+    } else {
+      cart.push({ ...product, qtd: qty });
+    }
+    renderCart();
+  }
+
+  function updateQtd(id, amount) {
+    const item = cart.find(i => i.id === id);
+    if (!item) return;
+    item.qtd += amount;
+    if (item.qtd <= 0) {
+      const idx = cart.indexOf(item);
+      cart.splice(idx, 1);
+    }
+    renderCart();
+  }
+
+  function renderCart() {
+    const body = document.getElementById('cart-body');
+    body.innerHTML = "";
+
+    let total = 0;
+    cart.forEach(i => {
+      total += i.preco * i.qtd;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="text-align:left;padding-left:12px">${i.nome}</td>
+        <td>${i.qtd}</td>
+        <td>R$ ${(i.preco * i.qtd).toFixed(2)}</td>
+        <td>
+          <button onclick="updateQtd(${i.id},1)">+</button>
+          <button onclick="updateQtd(${i.id},-1)">-</button>
+        </td>
+      `;
+      body.appendChild(tr);
+    });
+
+    document.getElementById('total').innerText = total.toFixed(2);
+  }
+
+  function showMsg(text, isError) {
+    const msg = document.getElementById('msg');
+    msg.style.display = 'block';
+    msg.className = 'msg ' + (isError ? 'error' : 'success');
+    msg.innerText = text;
+    setTimeout(()=>{ msg.style.display = 'none'; }, 4500);
+  }
+
+  function gerarNotaFiscalHTML(nome, cpf, email, endereco) {
+    let itensHTML = '';
+    let totalNF = 0;
+
+    cart.forEach(i => {
+      const subtotal = i.preco * i.qtd;
+      totalNF += subtotal;
+      itensHTML += `
+        <tr>
+          <td style="text-align:left;padding-left:8px">${i.nome}</td>
+          <td>${i.qtd}</td>
+          <td>R$ ${i.preco.toFixed(2)}</td>
+          <td>R$ ${subtotal.toFixed(2)}</td>
+        </tr>`;
+    });
+
+    const now = new Date();
+
+    return `
+      <div>
+        <h3>Nota Fiscal (Simples)</h3>
+        <p><strong>Cliente:</strong> ${nome}</p>
+        <p><strong>CPF/CNPJ:</strong> ${cpf}</p>
+        <p><strong>Email:</strong> ${email}</p>
+        <p><strong>Endereço:</strong> ${endereco}</p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Produto</th>
+              <th>Qtd</th>
+              <th>Preço</th>
+              <th>Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itensHTML}
+          </tbody>
+        </table>
+
+        <p class="total">Total da Nota: R$ ${totalNF.toFixed(2)}</p>
+        <p class="small">Emitida em: ${now.toLocaleString()}</p>
+      </div>
+    `;
+  }
+
+  function emitirNota() {
+    const nome = document.getElementById('nome').value.trim();
+    const cpf = document.getElementById('cpf').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const endereco = document.getElementById('endereco').value.trim();
+
+    if (!nome || !cpf || !email || !endereco || cart.length === 0) {
+      showMsg("Preencha todos os campos e adicione itens ao carrinho.", true);
+      return;
+    }
+
+    // Gerar HTML da nota e mostrar abaixo do botão
+    const notaDiv = document.getElementById('notaFiscal');
+    notaDiv.innerHTML = gerarNotaFiscalHTML(nome, cpf, email, endereco);
+    notaDiv.style.display = 'block';
+
+    showMsg("Nota gerada com sucesso!", false);
+  }
+
+  function toggleDarkMode(){
+    document.body.classList.toggle('dark');
+    // salvar preferência
+    localStorage.setItem('themeDark', document.body.classList.contains('dark'));
+  }
+
+  // carregar preferência
+  if (localStorage.getItem('themeDark') === 'true') document.body.classList.add('dark');
+
+  // Inicializa
+  renderProducts();
+  renderCart();
+</script>
+
+</body>
+</html>
